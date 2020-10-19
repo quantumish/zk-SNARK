@@ -41,7 +41,9 @@ void* start_verifier(void* args)
     int unproven = 1;
     int g = 6;
     int degree = 3;
-    int n = 7;
+    int n = 17;
+    int s_1;
+    int a;
     while (unproven) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);
         if (recvlen > BUFSIZE) sendto(s, "ERR: Too long.", 14, 0, (struct sockaddr *) &remaddr, addrlen);
@@ -53,19 +55,32 @@ void* start_verifier(void* args)
                 clients[connections] = remaddr.sin_port;
                 connections++;
                 srand(time(0));
-                int s = rand() % 3;
-                int a = rand() % 3;
+                s_1 = rand() % 3;
+                a = rand() % 3;
                 int* enc_s = malloc(sizeof(int)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
-                    enc_s[i] = (int)pow(g, pow(s, i)) % n;
-                    enc_s[degree+1+i] = (int)pow(g, a*pow(s,i)) % n;
+                    enc_s[i] = (int)pow(g, pow(s_1, i)) % n;
+                    enc_s[degree+1+i] = (int)pow(g, a*pow(s_1,i)) % n;
                 }
-                printf("%d %d\n", s, a);
+                printf("%d %d\n", s_1, a);
                 for (int i = 0; i < 8; i++) printf("%d ", enc_s[i]);
                 printf("\n");
                 msg = enc_s;
             } else if (recvlen == 12) {
-                
+                if (pow(((int*)buf)[0], a) == ((int*)buf)[1]) {
+                    printf(" VERIFIER │ Polynomial of valid form used! pow(%d, %d) == %d\n", ((int*)buf)[0], a, ((int*)buf)[1]);
+                }
+                else {
+                    printf(" VERIFIER │ Polynomial of invalid form used! pow(%d, %d) ≠ %d\n", ((int*)buf)[0], a, ((int*)buf)[1]);
+                    return 0x1;
+                }
+                if (((int*)buf)[0] == pow(((int*)buf)[2], (s_1-2)*(s_1-1))) {
+                    printf(" VERIFIER │ Valid proof! pow(%d, %d) == %d\n", ((int*)buf)[2], (s_1-2)*(s_1-1), ((int*)buf)[0]);
+                }
+                else {
+                    printf(" VERIFIER │ Invalid proof! pow(%d, %d) ≠ %d\n", ((int*)buf)[2], (s_1-2)*(s_1-1), ((int*)buf)[0]);
+                    return 0x1;
+                }
             }
             if (msg != 0x0) sendto(s, msg, 32, 0, (struct sockaddr *) &remaddr, addrlen);
         }
@@ -98,7 +113,7 @@ void* start_prover(void* args)
     int recvlen;
     socklen_t len = sizeof(addr);
     int phase = 0;
-    int constants[4] = {1, 3, 2, 0};
+    int constants[4] = {0, 2, -3, 1};
     int degree = 3;
     while (1==1) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
@@ -115,7 +130,7 @@ void* start_prover(void* args)
                 enc_ph[1] *= (int)pow(((int*)buf)[i+degree+1], constants[i]);
                 printf("%d %d\n", enc_ph[1], (int)pow(((int*)buf)[i+1+degree], constants[i]));
             }
-            enc_ph[2] = enc_ph[0]/((((int*)buf)[0] - 1)*(((int*)buf)[0] - 2));
+            enc_ph[2] = (((int*)buf)[1]); // Use actual polynomial division in the future?
             printf("%d %d %d\n", enc_ph[0], enc_ph[1], enc_ph[2]);
             sendto(s, enc_ph, 12, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
