@@ -42,7 +42,7 @@ void* start_verifier(void* args)
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);
         if (recvlen > BUFSIZE) sendto(s, "ERR: Too long.", 14, 0, (struct sockaddr *) &remaddr, addrlen);
         else if (recvlen > 0) {
-            printf(" SERVER │ Received %d-byte message from %i: \"%s\"\n", recvlen, remaddr.sin_port, buf);
+            printf(" VERIFIER │ Received %d-byte message from %i: \"%s\"\n", recvlen, remaddr.sin_port, buf);
             if (strcmp((const char*) buf, "Begin proof.")==0) {
                 clients[connections] = remaddr.sin_port;
                 connections++;
@@ -55,6 +55,34 @@ void* start_verifier(void* args)
 
 void* start_prover(void* args)
 {
+    // Same socket is needed on client end so initialize all over again.
+    int s;
+    if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        printf("\n Error : Socket Failed \n");
+    }
+    struct sockaddr_in addr;
+    memset((char *)&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET; // Specify address family.
+    addr.sin_addr.s_addr = htonl(INADDR_ANY); // INADDR_ANY just 0.0.0.0, machine IP address
+    addr.sin_port = htons(PORT); // Specify port.
+    // Connect to server
+    if(connect(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        printf("ERR: Connect failed.\n");
+        return 0x0;
+    }
+    // NOTE This can and will not work if flag argument set to 1
+    sendto(s, "Begin proof.", BUFSIZE, 0, (struct sockaddr*)NULL, sizeof(addr));
+    printf(" Prover   │ Informed server of existence.\n");
+    char buf[BUFSIZE];
+    int recvlen;
+    socklen_t len = sizeof(addr);
+    while (1==1) {
+        recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
+        if (recvlen > 0) {
+            buf[recvlen] = 0;
+            printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
+        }
+    }
     return 0x0;
 }
 
