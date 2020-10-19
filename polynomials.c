@@ -7,6 +7,8 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <math.h>
+#include <time.h> 
 
 #define PORT 5000
 #define BUFSIZE 1024
@@ -37,6 +39,9 @@ void* start_verifier(void* args)
     int connections = 0;
     int clients[500];
     int unproven = 1;
+    int g = 6;
+    int degree = 3;
+    int n = 7;
     while (unproven) {
         buf[recvlen] = 0; // Need a null-terminator!
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);
@@ -46,6 +51,15 @@ void* start_verifier(void* args)
             if (strcmp((const char*) buf, "Begin proof.")==0) {
                 clients[connections] = remaddr.sin_port;
                 connections++;
+                srand(time(0));
+                int s = rand() % 5000;
+                int a = rand() % 5000;
+                int enc_s[(degree+1)*2];
+                for (int i = 0; i <= degree; i++) {
+                    enc_s[i] = pow(g, pow(s, i)) % n;
+                    enc_s[degree+1+i] = pow(g, a*pow(s,i)) % n;
+                }
+                sendto(s, enc_s, BUFSIZE, 0, (struct sockaddr *) &remaddr, addrlen);
             }
         }
     }
@@ -76,11 +90,20 @@ void* start_prover(void* args)
     char buf[BUFSIZE];
     int recvlen;
     socklen_t len = sizeof(addr);
+    int phase = 0;
+    int constants[4] = {312, 543, 987, 34};
     while (1==1) {
+        printf("Ping\n");
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
         if (recvlen > 0) {
             buf[recvlen] = 0;
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
+            int enc_p[2];
+            for (int i = 0; i <= degree; i++) {
+                enc_p[0] = pow(((int*)buf)[i], constants[i]);
+                enc_p[1] = pow(((int*)buf)[i+degree+1], constants[i]);
+            }
+            sendto(s, enc_p, BUFSIZE, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
     return 0x0;
