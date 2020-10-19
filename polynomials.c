@@ -43,24 +43,29 @@ void* start_verifier(void* args)
     int degree = 3;
     int n = 7;
     while (unproven) {
-        buf[recvlen] = 0; // Need a null-terminator!
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);
         if (recvlen > BUFSIZE) sendto(s, "ERR: Too long.", 14, 0, (struct sockaddr *) &remaddr, addrlen);
         else if (recvlen > 0) {
+            void* msg = 0x0;
+            buf[recvlen] = 0;
             printf(" VERIFIER │ Received %d-byte message from %i: \"%s\"\n", recvlen, remaddr.sin_port, buf);
             if (strcmp((const char*) buf, "Begin proof.")==0) {
                 clients[connections] = remaddr.sin_port;
                 connections++;
                 srand(time(0));
-                int s = rand() % 5000;
-                int a = rand() % 5000;
-                int enc_s[(degree+1)*2];
+                int s = rand() % 3;
+                int a = rand() % 3;
+                int* enc_s = malloc(sizeof(int)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
-                    enc_s[i] = pow(g, pow(s, i)) % n;
-                    enc_s[degree+1+i] = pow(g, a*pow(s,i)) % n;
+                    enc_s[i] = (int)pow(g, pow(s, i));
+                    enc_s[degree+1+i] = (int)pow(g, a*pow(s,i));
                 }
-                sendto(s, enc_s, BUFSIZE, 0, (struct sockaddr *) &remaddr, addrlen);
+                printf("%d %d\n", s, a);
+                for (int i = 0; i < 8; i++) printf("%d ", enc_s[i]);
+                printf("\n");
+                msg = enc_s;
             }
+            if (msg != 0x0) sendto(s, msg, 32, 0, (struct sockaddr *) &remaddr, addrlen);
         }
     }
     
@@ -91,19 +96,25 @@ void* start_prover(void* args)
     int recvlen;
     socklen_t len = sizeof(addr);
     int phase = 0;
-    int constants[4] = {312, 543, 987, 34};
+    int constants[4] = {1, 2, 3, 4};
+    int degree = 3;
     while (1==1) {
-        printf("Ping\n");
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
+        printf("Test\n");
         if (recvlen > 0) {
             buf[recvlen] = 0;
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
-            int enc_p[2];
+            for (int i = 0; i < 8; i++) printf("%d ", ((int*)buf)[i]);
+            printf("\n");
+            int enc_p[2] = {1,1};
             for (int i = 0; i <= degree; i++) {
-                enc_p[0] = pow(((int*)buf)[i], constants[i]);
-                enc_p[1] = pow(((int*)buf)[i+degree+1], constants[i]);
+                enc_p[0] *= (int)pow(((int*)buf)[i], constants[i]);
+                printf("%d %d\n", enc_p[0], (int)pow(((int*)buf)[i], constants[i]));
+                enc_p[1] *= (int)pow(((int*)buf)[i+degree+1], constants[i]);
+                printf("%d %d\n", enc_p[1], (int)pow(((int*)buf)[i+1+degree], constants[i]));
             }
-            sendto(s, enc_p, BUFSIZE, 0, (struct sockaddr*)NULL, sizeof(addr));
+            printf("%d %d\n", enc_p[0], enc_p[1]);
+            sendto(s, enc_p, 8, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
     return 0x0;
