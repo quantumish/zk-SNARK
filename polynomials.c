@@ -55,30 +55,30 @@ void* start_verifier(void* args)
                 clients[connections] = remaddr.sin_port;
                 connections++;
                 srand(time(0));
-                s_1 = rand() % 3;
-                a = rand() % 3;
+                s_1 = rand() % 5;
+                a = rand() % 5;
                 int* enc_s = malloc(sizeof(int)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
-                    enc_s[i] = (int)pow(g, pow(s_1, i)) % n;
-                    enc_s[degree+1+i] = (int)pow(g, a*pow(s_1,i)) % n;
+                    enc_s[i] = (int)pow(g, pow(s_1, i));
+                    enc_s[degree+1+i] = (int)pow(g, a*pow(s_1,i));
                 }
                 printf("%d %d\n", s_1, a);
                 for (int i = 0; i < 8; i++) printf("%d ", enc_s[i]);
                 printf("\n");
                 msg = enc_s;
             } else if (recvlen == 12) {
-                if (pow(((int*)buf)[0], a) == ((int*)buf)[1]) {
-                    printf(" VERIFIER │ Polynomial of valid form used! pow(%d, %d) == %d\n", ((int*)buf)[0], a, ((int*)buf)[1]);
+                if (pow(((float*)buf)[0], a) == ((float*)buf)[1]) {
+                    printf(" VERIFIER │ Polynomial of valid form used! pow(%f, %f) == %f\n", ((float*)buf)[0], (float)a, ((float*)buf)[1]);
                 }
                 else {
-                    printf(" VERIFIER │ Polynomial of invalid form used! pow(%d, %d) ≠ %d\n", ((int*)buf)[0], a, ((int*)buf)[1]);
+                    printf(" VERIFIER │ Polynomial of invalid form used! pow(%f, %f) ≠ %f\n but %f", ((float*)buf)[0], a, ((float*)buf)[1], pow(((float*)buf)[0], a));
                     return 0x1;
                 }
-                if (((int*)buf)[0] == pow(((int*)buf)[2], (s_1-2)*(s_1-1))) {
-                    printf(" VERIFIER │ Valid proof! pow(%d, %d) == %d\n", ((int*)buf)[2], (s_1-2)*(s_1-1), ((int*)buf)[0]);
+                if (((float*)buf)[0] == pow(((float*)buf)[2], (s_1-2)*(s_1-1))) {
+                    printf(" VERIFIER │ Valid proof! pow(%f, %f) == %f\n", ((float*)buf)[2], (s_1-2)*(s_1-1), ((float*)buf)[0]);
                 }
                 else {
-                    printf(" VERIFIER │ Invalid proof! pow(%d, %d) ≠ %d\n", ((int*)buf)[2], (s_1-2)*(s_1-1), ((int*)buf)[0]);
+                    printf(" VERIFIER │ Invalid proof! pow(%f, %f) ≠ %f\n", ((float*)buf)[2], (s_1-2)*(s_1-1), ((float*)buf)[0]);
                     return 0x1;
                 }
             }
@@ -123,15 +123,15 @@ void* start_prover(void* args)
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
             for (int i = 0; i < 8; i++) printf("%d ", ((int*)buf)[i]);
             printf("\n");
-            int enc_ph[3] = {1,1,1};
+            float enc_ph[3] = {1,1,1};
             for (int i = 0; i <= degree; i++) {
-                enc_ph[0] *= (int)pow(((int*)buf)[i], constants[i]);
-                printf("%d %d\n", enc_ph[0], (int)pow(((int*)buf)[i], constants[i]));
-                enc_ph[1] *= (int)pow(((int*)buf)[i+degree+1], constants[i]);
-                printf("%d %d\n", enc_ph[1], (int)pow(((int*)buf)[i+1+degree], constants[i]));
+                enc_ph[0] *= pow(((int*)buf)[i], constants[i]);
+                printf("(%d) %f %f\n", i, enc_ph[0], pow(((int*)buf)[i], constants[i]));
+                enc_ph[1] *= pow(((int*)buf)[i+degree+1], constants[i]);
+                printf("%f %f\n", enc_ph[1], pow(((int*)buf)[i+1+degree], constants[i]));
             }
             enc_ph[2] = (((int*)buf)[1]); // Use actual polynomial division in the future?
-            printf("%d %d %d\n", enc_ph[0], enc_ph[1], enc_ph[2]);
+            printf("%f %f %f\n", enc_ph[0], enc_ph[1], enc_ph[2]);
             sendto(s, enc_ph, 12, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
