@@ -57,13 +57,15 @@ void* start_verifier(void* args)
                 int a = rand() % 3;
                 int* enc_s = malloc(sizeof(int)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
-                    enc_s[i] = (int)pow(g, pow(s, i));
-                    enc_s[degree+1+i] = (int)pow(g, a*pow(s,i));
+                    enc_s[i] = (int)pow(g, pow(s, i)) % n;
+                    enc_s[degree+1+i] = (int)pow(g, a*pow(s,i)) % n;
                 }
                 printf("%d %d\n", s, a);
                 for (int i = 0; i < 8; i++) printf("%d ", enc_s[i]);
                 printf("\n");
                 msg = enc_s;
+            } else if (recvlen == 12) {
+                
             }
             if (msg != 0x0) sendto(s, msg, 32, 0, (struct sockaddr *) &remaddr, addrlen);
         }
@@ -96,7 +98,7 @@ void* start_prover(void* args)
     int recvlen;
     socklen_t len = sizeof(addr);
     int phase = 0;
-    int constants[4] = {1, 2, 3, 4};
+    int constants[4] = {1, 3, 2, 0};
     int degree = 3;
     while (1==1) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
@@ -106,15 +108,16 @@ void* start_prover(void* args)
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
             for (int i = 0; i < 8; i++) printf("%d ", ((int*)buf)[i]);
             printf("\n");
-            int enc_p[2] = {1,1};
+            int enc_ph[3] = {1,1,1};
             for (int i = 0; i <= degree; i++) {
-                enc_p[0] *= (int)pow(((int*)buf)[i], constants[i]);
-                printf("%d %d\n", enc_p[0], (int)pow(((int*)buf)[i], constants[i]));
-                enc_p[1] *= (int)pow(((int*)buf)[i+degree+1], constants[i]);
-                printf("%d %d\n", enc_p[1], (int)pow(((int*)buf)[i+1+degree], constants[i]));
+                enc_ph[0] *= (int)pow(((int*)buf)[i], constants[i]);
+                printf("%d %d\n", enc_ph[0], (int)pow(((int*)buf)[i], constants[i]));
+                enc_ph[1] *= (int)pow(((int*)buf)[i+degree+1], constants[i]);
+                printf("%d %d\n", enc_ph[1], (int)pow(((int*)buf)[i+1+degree], constants[i]));
             }
-            printf("%d %d\n", enc_p[0], enc_p[1]);
-            sendto(s, enc_p, 8, 0, (struct sockaddr*)NULL, sizeof(addr));
+            enc_ph[2] = enc_ph[0]/((((int*)buf)[0] - 1)*(((int*)buf)[0] - 2));
+            printf("%d %d %d\n", enc_ph[0], enc_ph[1], enc_ph[2]);
+            sendto(s, enc_ph, 12, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
     return 0x0;
