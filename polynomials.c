@@ -59,23 +59,29 @@ void* start_verifier(void* args)
                 s_1 = rand() % 100;
                 a = rand() % 100;
                 printf("%d %d\n", s_1, a);
-                mpz_t* enc_s = malloc(sizeof(mpz_t)*(degree+1)*2);
+                mpf_t* enc_s = malloc(sizeof(mpf_t)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
-                    mpz_init(enc_s[i]);
-                    mpz_ui_pow_ui(enc_s[i], g, (int)pow(s_1, i));
-                    mpz_init(enc_s[degree+1+i]);
-                    mpz_ui_pow_ui(enc_s[i+1+degree], g, (int)a*pow(s_1, i));
+                    mpf_init(enc_s[i]);
+                    mpz_t tmp1;
+                    mpz_init(tmp1);
+                    mpz_ui_pow_ui(tmp1, g, (int)pow(s_1, i));
+                    mpf_set_z(enc_s[i], tmp1);
+                    mpf_init(enc_s[degree+1+i]);
+                    mpz_t tmp2;
+                    mpz_init(tmp2);
+                    mpz_ui_pow_ui(tmp2, g, (int)a*pow(s_1, i));
+                    mpf_set_z(enc_s[i+1+degree], tmp2);
                 }
                 //for (int i = 0; i < 8; i++) gmp_printf("%Zd ", enc_s[i]);
                 //printf("\n");
                 msg = enc_s;
-            } else if (recvlen == sizeof(mpz_t)*3) {
-                for (int i = 0; i < 3; i++) printf("%Zd ", ((mpz_t*)buf)[i]);
-                printf("\n");
+            } else if (recvlen == sizeof(mpf_t)*3) {
+                //for (int i = 0; i < 3; i++) gmp_printf("%Zd ", ((mpf_t*)buf)[i]);
+                //printf("\n");
                 if (((int*)buf)[0] == pow(((int*)buf)[2], s_1)) printf("Valid roots!\n");
                 if (((int*)buf)[1] == pow(((int*)buf)[0], a)) printf("Valid form!\n");
             }
-            if (msg != 0x0) sendto(s, msg, sizeof(mpz_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
+            if (msg != 0x0) sendto(s, msg, sizeof(mpf_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
         }
     }
     
@@ -113,17 +119,20 @@ void* start_prover(void* args)
         if (recvlen > 0) {
             buf[recvlen] = 0;
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
-            mpz_t* enc_ph = malloc(sizeof(mpz_t)*3);
-            mpz_init_set_ui(enc_ph[0], 1);
-            mpz_init_set_ui(enc_ph[1], 1);
+            mpf_t* enc_ph = malloc(sizeof(mpf_t)*3);
+            mpf_init_set_ui(enc_ph[0], 1);
+            mpf_init_set_ui(enc_ph[1], 1);
             for (int i = 0; i < degree+1; i++) {
-                mpz_pow_ui(((mpz_t*)buf)[i], abs(constants[i]));
-                mpz_mul(enc_ph[0], enc_ph[0], ((mpz_t*)buf)[i]);
-                mpz_pow_ui(((mpz_t*)buf)[i+degree+1], abs(constants[i]));
-                mpz_mul(enc_ph[1], enc_ph[1], ((mpz_t*)buf)[i+1+degree]);
+                mpf_pow_ui(((mpf_t*)buf)[i], ((mpf_t*)buf)[i], abs(constants[i]));
+                if (constants[i] < 0) mpf_ui_div(((mpf_t*)buf)[i], 1, ((mpf_t*)buf)[i]);
+                mpf_mul(enc_ph[0], enc_ph[0], ((mpf_t*)buf)[i]);
+                mpf_pow_ui(((mpf_t*)buf)[i+degree+1], ((mpf_t*)buf)[i+degree+1], abs(constants[i]));
+                if (constants[i] < 0) mpf_ui_div(((mpf_t*)buf)[i+1+degree], 1, ((mpf_t*)buf)[i+1+degree]);
+                mpf_mul(enc_ph[1], enc_ph[1], ((mpf_t*)buf)[i+1+degree]);
             }
-            mpz_init_set_ui(enc_ph[2], ((int*)buf)[1]);
-            sendto(s, enc_ph, sizeof(mpz_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
+            mpf_init(enc_ph[2]);
+            mpf_set(enc_ph[2], ((mpf_t*)buf)[1]);
+            sendto(s, enc_ph, sizeof(mpf_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
     return 0x0;
