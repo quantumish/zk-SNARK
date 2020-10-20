@@ -67,22 +67,10 @@ void* start_verifier(void* args)
                 printf("\n");
                 msg = enc_s;
             } else if (recvlen == 12) {
-                printf("Enumerating...\n");
-                for (int i = 0; i < 3; i++) printf("%f\n", ((float*)buf)[i]);
-                if (pow(((float*)buf)[0], a) == ((float*)buf)[1]) {
-                    printf(" VERIFIER │ Polynomial of valid form used! pow(%f, %f) == %f\n", ((float*)buf)[0], (float)a, ((float*)buf)[1]);
-                }
-                else {
-                    printf(" VERIFIER │ Polynomial of invalid form used! pow(%f, %f) ≠ %f\n but %f", ((float*)buf)[0], a, ((float*)buf)[1], pow(((float*)buf)[0], a));
-                    return 0x1;
-                }
-                if (((float*)buf)[0] == pow(((float*)buf)[2], (s_1-2)*(s_1-1))) {
-                    printf(" VERIFIER │ Valid proof! pow(%f, %f) == %f\n", ((float*)buf)[2], (s_1-2)*(s_1-1), ((float*)buf)[0]);
-                }
-                else {
-                    printf(" VERIFIER │ Invalid proof! pow(%f, %f) ≠ %f\n", ((float*)buf)[2], (s_1-2)*(s_1-1), ((float*)buf)[0]);
-                    return 0x1;
-                }
+                for (int i = 0; i < 3; i++) printf("%d ", ((int*)buf)[i]);
+                printf("\n");
+                if (((int*)buf)[0] == pow(((int*)buf)[2], s_1)) printf("Valid roots!\n");
+                if (((int*)buf)[1] == pow(((int*)buf)[0], a)) printf("Valid form!\n");
             }
             if (msg != 0x0) sendto(s, msg, 32, 0, (struct sockaddr *) &remaddr, addrlen);
         }
@@ -119,21 +107,18 @@ void* start_prover(void* args)
     int degree = 3;
     while (1==1) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
-        printf("Test\n");
         if (recvlen > 0) {
             buf[recvlen] = 0;
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
-            for (int i = 0; i < 8; i++) printf("%f ", ((float*)buf)[i]);
-            printf("\n");
-            float enc_ph[3] = {1,1,1};
-            for (int i = 0; i <= degree; i++) {
-                enc_ph[0] *= pow(((float*)buf)[i], constants[i]);
-                printf("(%d) %f %f (aka pow(%f, %i))\n", i, enc_ph[0], pow(((float*)buf)[i], constants[i]), ((float*)buf)[i], constants[i]);
-                enc_ph[1] *= pow(((float*)buf)[i+degree+1], constants[i]);
-                printf("%f %f\n", enc_ph[1], pow(((float*)buf)[i+1+degree], constants[i]));
+            int* enc_ph = malloc(sizeof(int)*3);
+            enc_ph[0] = 1;
+            enc_ph[1] = 1;
+            for (int i = 0; i < degree+1; i++) {
+                enc_ph[0] *= pow(((int*)buf)[i], constants[i]);
+                //printf("%d %f\n", enc_ph[0], pow(((int*)buf)[i], constants[i]));
+                enc_ph[1] *= pow(((int*)buf)[degree+1+i], constants[i]);
             }
-            enc_ph[2] = (((float*)buf)[1]); // Use actual polynomial division in the future?
-            printf("%f %f %f\n", enc_ph[0], enc_ph[1], enc_ph[2]);
+            enc_ph[2] = ((int*)buf)[1];
             sendto(s, enc_ph, 12, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
