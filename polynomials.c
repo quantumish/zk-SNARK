@@ -56,8 +56,8 @@ void* start_verifier(void* args)
                 clients[connections] = remaddr.sin_port;
                 connections++;
                 srand(time(0));
-                s_1 = rand() % 100;
-                a = rand() % 100;
+                s_1 = rand() % 10;
+                a = rand() % 10;
                 printf("%d %d\n", s_1, a);
                 mpf_t* enc_s = malloc(sizeof(mpf_t)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
@@ -72,14 +72,17 @@ void* start_verifier(void* args)
                     mpz_ui_pow_ui(tmp2, g, (int)a*pow(s_1, i));
                     mpf_set_z(enc_s[i+1+degree], tmp2);
                 }
-                //for (int i = 0; i < 8; i++) gmp_printf("%Zd ", enc_s[i]);
-                //printf("\n");
                 msg = enc_s;
             } else if (recvlen == sizeof(mpf_t)*3) {
-                //for (int i = 0; i < 3; i++) gmp_printf("%Zd ", ((mpf_t*)buf)[i]);
-                //printf("\n");
-                if (((int*)buf)[0] == pow(((int*)buf)[2], s_1)) printf("Valid roots!\n");
-                if (((int*)buf)[1] == pow(((int*)buf)[0], a)) printf("Valid form!\n");
+                mpf_t tmp1;
+                mpf_init(tmp1);
+                mpf_t tmp2;
+                mpf_init(tmp2);
+                mpf_pow_ui(tmp1, ((mpf_t*)buf)[2], s_1);
+                if (mpf_cmp(((mpf_t*)buf)[0], tmp1) == 0) printf("Valid roots!\n");
+                mpf_pow_ui(tmp2, ((mpf_t*)buf)[0], a);
+                if (mpf_cmp(((mpf_t*)buf)[1], tmp2) == 0) printf("Valid form!\n");
+                printf("Welp\n");
             }
             if (msg != 0x0) sendto(s, msg, sizeof(mpf_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
         }
