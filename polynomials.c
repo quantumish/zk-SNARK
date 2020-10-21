@@ -13,6 +13,7 @@
 
 #define PORT 5000
 #define BUFSIZE 1024
+#define EPSILON 0.000001
 
 void* start_verifier(void* args)
 {
@@ -78,11 +79,22 @@ void* start_verifier(void* args)
                 mpf_init(tmp1);
                 mpf_t tmp2;
                 mpf_init(tmp2);
-                mpf_pow_ui(tmp1, ((mpf_t*)buf)[2], s_1);
-                if (mpf_cmp(((mpf_t*)buf)[0], tmp1) == 0) printf("Valid roots!\n");
+                mpf_pow_ui(tmp1, ((mpf_t*)buf)[2], (s_1-1)*(s_1-2));
+                mpf_t tmp3;
+                mpf_init(tmp3);
+                mpf_div(tmp3, ((mpf_t*)buf)[0], tmp1);
+                mpf_abs(tmp3, tmp3);
+                mpf_ui_sub(tmp3, 1, tmp3);
+                gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[0], tmp1, tmp3);
+                if (mpf_cmp_d(tmp3, EPSILON) == -1) printf("Valid roots!\n");
                 mpf_pow_ui(tmp2, ((mpf_t*)buf)[0], a);
-                if (mpf_cmp(((mpf_t*)buf)[1], tmp2) == 0) printf("Valid form!\n");
-                printf("Welp\n");
+                mpf_t tmp4;
+                mpf_init(tmp4);
+                mpf_div(tmp4, ((mpf_t*)buf)[1], tmp2);
+                mpf_abs(tmp4, tmp4);
+                mpf_ui_sub(tmp4, 1, tmp4);
+                gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[1], tmp2, tmp4);
+                if (mpf_cmp_d(tmp4, EPSILON) == -1) printf("Valid form!\n");
             }
             if (msg != 0x0) sendto(s, msg, sizeof(mpf_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
         }
