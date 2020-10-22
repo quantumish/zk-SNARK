@@ -59,7 +59,7 @@ void* start_verifier(void* args)
                 srand(time(0));
                 s_1 = rand() % 10;
                 a = rand() % 10;
-                printf("%d %d\n", s_1, a);
+                printf(" VERIFIER │ Chose s = %d and a = %d\n", s_1, a);
                 mpf_t* enc_s = malloc(sizeof(mpf_t)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
                     mpf_init(enc_s[i]);
@@ -73,6 +73,7 @@ void* start_verifier(void* args)
                     mpz_ui_pow_ui(tmp2, g, (int)a*pow(s_1, i));
                     mpf_set_z(enc_s[i+1+degree], tmp2);
                 }
+                
                 msg = enc_s;
             } else if (recvlen == sizeof(mpf_t)*3) {
                 mpf_t tmp1;
@@ -85,16 +86,18 @@ void* start_verifier(void* args)
                 mpf_div(tmp3, ((mpf_t*)buf)[0], tmp1);
                 mpf_abs(tmp3, tmp3);
                 mpf_ui_sub(tmp3, 1, tmp3);
-                gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[0], tmp1, tmp3);
-                if (mpf_cmp_d(tmp3, EPSILON) == -1) printf("Valid roots!\n");
+                //gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[0], tmp1, tmp3);
+                if (mpf_cmp_d(tmp3, EPSILON) == -1) printf(" VERIFIER │ Valid roots!\n");
+                else printf(" VERIFIER │ ERR: Invalid roots!\n");
                 mpf_pow_ui(tmp2, ((mpf_t*)buf)[0], a);
                 mpf_t tmp4;
                 mpf_init(tmp4);
                 mpf_div(tmp4, ((mpf_t*)buf)[1], tmp2);
                 mpf_abs(tmp4, tmp4);
                 mpf_ui_sub(tmp4, 1, tmp4);
-                gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[1], tmp2, tmp4);
-                if (mpf_cmp_d(tmp4, EPSILON) == -1) printf("Valid form!\n");
+                //gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[1], tmp2, tmp4);
+                if (mpf_cmp_d(tmp4, EPSILON) == -1) printf(" VERIFIER │ Valid form!\n");
+                else printf(" VERIFIER │ ERR: Invalid form!\n");
             }
             if (msg != 0x0) sendto(s, msg, sizeof(mpf_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
         }
@@ -137,6 +140,8 @@ void* start_prover(void* args)
             mpf_t* enc_ph = malloc(sizeof(mpf_t)*3);
             mpf_init_set_ui(enc_ph[0], 1);
             mpf_init_set_ui(enc_ph[1], 1);
+            mpf_init(enc_ph[2]);
+            mpf_set(enc_ph[2], ((mpf_t*)buf)[1]);
             for (int i = 0; i < degree+1; i++) {
                 mpf_pow_ui(((mpf_t*)buf)[i], ((mpf_t*)buf)[i], abs(constants[i]));
                 if (constants[i] < 0) mpf_ui_div(((mpf_t*)buf)[i], 1, ((mpf_t*)buf)[i]);
@@ -145,8 +150,6 @@ void* start_prover(void* args)
                 if (constants[i] < 0) mpf_ui_div(((mpf_t*)buf)[i+1+degree], 1, ((mpf_t*)buf)[i+1+degree]);
                 mpf_mul(enc_ph[1], enc_ph[1], ((mpf_t*)buf)[i+1+degree]);
             }
-            mpf_init(enc_ph[2]);
-            mpf_set(enc_ph[2], ((mpf_t*)buf)[1]);
             sendto(s, enc_ph, sizeof(mpf_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
