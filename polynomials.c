@@ -46,6 +46,15 @@ void* start_verifier(void* args)
     int n = 17;
     int s_1;
     int a;
+    mpz_t bigs;
+    mpz_init_set_ui(bigs, s_1);
+    mpz_t biga;
+    mpz_init_set_ui(biga, a);
+    mpz_t bigg;
+    mpz_init_set_ui(bigg, g);
+    mpz_t bign;
+    mpz_init_set_ui(bign, n);
+    mpz_t t;
     while (unproven) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&remaddr, &addrlen);
         if (recvlen > BUFSIZE) sendto(s, "ERR: Too long.", 14, 0, (struct sockaddr *) &remaddr, addrlen);
@@ -57,49 +66,47 @@ void* start_verifier(void* args)
                 clients[connections] = remaddr.sin_port;
                 connections++;
                 srand(time(0));
-                s_1 = rand() % 10;
-                a = rand() % 10;
+                s_1 = rand() % 500;
+                a = rand() % 500;
+                mpz_init_set_ui(t, (s_1-1)*(s_1-2));
                 printf(" VERIFIER │ Chose s = %d and a = %d\n", s_1, a);
-                mpf_t* enc_s = malloc(sizeof(mpf_t)*(degree+1)*2);
+                mpz_t* enc_s = malloc(sizeof(mpz_t)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
-                    mpf_init(enc_s[i]);
-                    mpz_t tmp1;
-                    mpz_init(tmp1);
-                    mpz_ui_pow_ui(tmp1, g, (int)pow(s_1, i));
-                    mpf_set_z(enc_s[i], tmp1);
-                    mpf_init(enc_s[degree+1+i]);
-                    mpz_t tmp2;
-                    mpz_init(tmp2);
-                    mpz_ui_pow_ui(tmp2, g, (int)a*pow(s_1, i));
-                    mpf_set_z(enc_s[i+1+degree], tmp2);
-                }
-                
+                    mpz_init(enc_s[i]);
+                    mpz_t temp1;
+                    mpz_init_set_ui(temp1, (int)pow(s_1, i));
+                    mpz_powm_sec(enc_s[i], bigg, temp1, bign);
+                    mpz_init(enc_s[degree+1+i]);
+                    mpz_t temp2;
+                    mpz_init_set_ui(temp2, (int)a*pow(s_1, i));
+                    mpz_powm_sec(enc_s[i+1+degree], bigg, temp2, bign);
+                }                
                 msg = enc_s;
-            } else if (recvlen == sizeof(mpf_t)*3) {
-                mpf_t tmp1;
-                mpf_init(tmp1);
-                mpf_t tmp2;
-                mpf_init(tmp2);
-                mpf_pow_ui(tmp1, ((mpf_t*)buf)[2], (s_1-1)*(s_1-2));
-                mpf_t tmp3;
-                mpf_init(tmp3);
-                mpf_div(tmp3, ((mpf_t*)buf)[0], tmp1);
-                mpf_abs(tmp3, tmp3);
-                mpf_ui_sub(tmp3, 1, tmp3);
-                //gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[0], tmp1, tmp3);
-                if (mpf_cmp_d(tmp3, EPSILON) == -1) printf(" VERIFIER │ Valid roots!\n");
+            } else if (recvlen == sizeof(mpz_t)*3) {
+                mpz_t tmp1;
+                mpz_init(tmp1);
+                mpz_t tmp2;
+                mpz_init(tmp2);
+                mpz_powm_sec(tmp1, ((mpz_t*)buf)[2], t, bign);
+                mpz_t tmp3;
+                mpz_init(tmp3);
+                mpz_div(tmp3, ((mpz_t*)buf)[0], tmp1);
+                mpz_abs(tmp3, tmp3);
+                mpz_ui_sub(tmp3, 1, tmp3);
+                //gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpz_t*)buf)[0], tmp1, tmp3);
+                if (mpz_cmp_d(tmp3, EPSILON) == -1) printf(" VERIFIER │ Valid roots!\n");
                 else printf(" VERIFIER │ ERR: Invalid roots!\n");
-                mpf_pow_ui(tmp2, ((mpf_t*)buf)[0], a);
-                mpf_t tmp4;
-                mpf_init(tmp4);
-                mpf_div(tmp4, ((mpf_t*)buf)[1], tmp2);
-                mpf_abs(tmp4, tmp4);
-                mpf_ui_sub(tmp4, 1, tmp4);
-                //gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpf_t*)buf)[1], tmp2, tmp4);
-                if (mpf_cmp_d(tmp4, EPSILON) == -1) printf(" VERIFIER │ Valid form!\n");
+                mpz_powm_sec(tmp2, ((mpz_t*)buf)[0], biga, bign); 
+                mpz_t tmp4;
+                mpz_init(tmp4);
+                mpz_div(tmp4, ((mpz_t*)buf)[1], tmp2);
+                mpz_abs(tmp4, tmp4);
+                mpz_ui_sub(tmp4, 1, tmp4);
+                //gmp_printf("%Fe %Fe (diff %Fe)\n", ((mpz_t*)buf)[1], tmp2, tmp4);
+                if (mpz_cmp_d(tmp4, EPSILON) == -1) printf(" VERIFIER │ Valid form!\n");
                 else printf(" VERIFIER │ ERR: Invalid form!\n");
             }
-            if (msg != 0x0) sendto(s, msg, sizeof(mpf_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
+            if (msg != 0x0) sendto(s, msg, sizeof(mpz_t)*(degree+1)*2, 0, (struct sockaddr *) &remaddr, addrlen);
         }
     }
     
@@ -130,27 +137,24 @@ void* start_prover(void* args)
     int recvlen;
     socklen_t len = sizeof(addr);
     int phase = 0;
-    int constants[4] = {0, 2, -3, 1};
+    int constants[4] = {0, 2, 3, 1};
     int degree = 3;
     while (1==1) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
         if (recvlen > 0) {
             buf[recvlen] = 0;
             printf(" Prover   │ Received %d-byte message from server: \"%s\"\n", recvlen, buf);
-            mpf_t* enc_ph = malloc(sizeof(mpf_t)*3);
-            mpf_init_set_ui(enc_ph[0], 1);
-            mpf_init_set_ui(enc_ph[1], 1);
-            mpf_init(enc_ph[2]);
-            mpf_set(enc_ph[2], ((mpf_t*)buf)[1]);
+            mpz_t* enc_ph = malloc(sizeof(mpz_t)*3);
+            mpz_init_set_ui(enc_ph[0], 1);
+            mpz_init_set_ui(enc_ph[1], 1);
+            mpz_init(enc_ph[2]);
+            mpz_set(enc_ph[2], ((mpz_t*)buf)[1]);
             for (int i = 0; i < degree+1; i++) {
-                mpf_pow_ui(((mpf_t*)buf)[i], ((mpf_t*)buf)[i], abs(constants[i]));
-                if (constants[i] < 0) mpf_ui_div(((mpf_t*)buf)[i], 1, ((mpf_t*)buf)[i]);
-                mpf_mul(enc_ph[0], enc_ph[0], ((mpf_t*)buf)[i]);
-                mpf_pow_ui(((mpf_t*)buf)[i+degree+1], ((mpf_t*)buf)[i+degree+1], abs(constants[i]));
-                if (constants[i] < 0) mpf_ui_div(((mpf_t*)buf)[i+1+degree], 1, ((mpf_t*)buf)[i+1+degree]);
-                mpf_mul(enc_ph[1], enc_ph[1], ((mpf_t*)buf)[i+1+degree]);
+                mpz_pow_ui(((mpz_t*)buf)[i], ((mpz_t*)buf)[i], abs(constants[i]));
+                mpz_mul(enc_ph[0], enc_ph[0], ((mpz_t*)buf)[i]);
+                mpz_mul(enc_ph[1], enc_ph[1], ((mpz_t*)buf)[i+1+degree]);
             }
-            sendto(s, enc_ph, sizeof(mpf_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
+            sendto(s, enc_ph, sizeof(mpz_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
     return 0x0;
