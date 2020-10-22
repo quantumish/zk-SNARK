@@ -139,6 +139,7 @@ void* start_prover(void* args)
     int phase = 0;
     int constants[4] = {0, 2, 3, 1};
     int degree = 3;
+    int delta = rand() % 100;
     while (1==1) {
         recvlen = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *) &addr, &len);
         if (recvlen > 0) {
@@ -154,6 +155,7 @@ void* start_prover(void* args)
                 mpz_mul(enc_ph[0], enc_ph[0], ((mpz_t*)buf)[i]);
                 mpz_mul(enc_ph[1], enc_ph[1], ((mpz_t*)buf)[i+1+degree]);
             }
+            for (int i = 0; i < 3; i++) mpz_pow_ui(enc_ph[i], enc_ph[i], delta);
             sendto(s, enc_ph, sizeof(mpz_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
     }
