@@ -62,18 +62,19 @@ void* start_verifier(void* args)
             void* msg = 0x0;
             buf[recvlen] = 0;
             printf(" VERIFIER │ Received %d-byte message from %i: \"%s\"\n", recvlen, remaddr.sin_port, buf);
-            if (strcmp((const char*) buf, "Begin proof.")==0) {
+            if (recvlen==8) {
                 clients[connections] = remaddr.sin_port;
                 connections++;
                 srand(time(0));
                 s_1 = rand() % 500;
                 a = rand() % 500;
-                mpz_init_set_ui(t, (s_1-1)*(s_1-2));
+                mpz_init_set_ui(t, (s_1-((int*)buf)[0])*(s_1-((int*)buf)[1]));
                 printf(" VERIFIER │ Chose s = %d and a = %d\n", s_1, a);
                 mpz_t* enc_s = malloc(sizeof(mpz_t)*(degree+1)*2);
                 for (int i = 0; i <= degree; i++) {
                     mpz_init(enc_s[i]);
                     mpz_t temp1;
+
                     mpz_init_set_ui(temp1, (int)pow(s_1, i));
                     mpz_powm_sec(enc_s[i], bigg, temp1, bign);
                     mpz_init(enc_s[degree+1+i]);
@@ -131,7 +132,8 @@ void* start_prover(void* args)
         return 0x0;
     }
     // NOTE This can and will not work if flag argument set to 1
-    sendto(s, "Begin proof.", BUFSIZE, 0, (struct sockaddr*)NULL, sizeof(addr));
+    int roots[2] = {-1,-2};
+    sendto(s, roots, 8, 0, (struct sockaddr*)NULL, sizeof(addr));
     printf(" Prover   │ Informed server of existence.\n");
     char buf[BUFSIZE];
     int recvlen;
@@ -149,12 +151,23 @@ void* start_prover(void* args)
             mpz_init_set_ui(enc_ph[0], 1);
             mpz_init_set_ui(enc_ph[1], 1);
             mpz_init(enc_ph[2]);
-            mpz_set(enc_ph[2], ((mpz_t*)buf)[1]);
             for (int i = 0; i < degree+1; i++) {
                 mpz_pow_ui(((mpz_t*)buf)[i], ((mpz_t*)buf)[i], abs(constants[i]));
                 mpz_mul(enc_ph[0], enc_ph[0], ((mpz_t*)buf)[i]);
                 mpz_mul(enc_ph[1], enc_ph[1], ((mpz_t*)buf)[i+1+degree]);
             }
+            mpz_t tmp1;
+            mpz_init(tmp1);
+            mpz_pow_ui(tmp1, ((mpz_t*)buf)[0], -roots[0]);
+            mpz_mul(tmp1, tmp1, ((mpz_t*)buf)[1]);
+            mpz_t tmp2;
+            mpz_init(tmp2);            
+            mpz_pow_ui(tmp1, ((mpz_t*)buf)[0], -roots[1]);
+            mpz_mul(tmp1, tmp1, ((mpz_t*)buf)[1]);
+            mpz_t denom;
+            mpz_init(denom);
+            mpz_mul(denom, tmp1, tmp2);
+            mpz_div(enc_ph[2], enc_ph[0], denom);
             for (int i = 0; i < 3; i++) mpz_pow_ui(enc_ph[i], enc_ph[i], delta);
             sendto(s, enc_ph, sizeof(mpz_t)*3, 0, (struct sockaddr*)NULL, sizeof(addr));
         }
